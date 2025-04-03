@@ -2,6 +2,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
+
 from krapp.date_extractor import DateExtractor
 
 
@@ -66,6 +68,27 @@ class TextDBManager:
                 )
             except Exception as e:
                 print(f"Error processing file {file_path}: {e}")
+
+    def get_entries_by_year_month(self, year, month):
+        self.cursor.execute(
+            "SELECT id, date, title, content FROM entries WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ? ORDER BY date DESC",
+            (year, month),
+        )
+        rows = self.cursor.fetchall()
+        return pd.DataFrame(rows, columns=["ID", "Date", "Title", "Content"])
+
+    def get_all_years(self):
+        self.cursor.execute(
+            "SELECT DISTINCT strftime('%Y', date) as year FROM entries ORDER BY year DESC"
+        )
+        return [row[0] for row in self.cursor.fetchall()]
+
+    def get_months_in_year(self, year):
+        self.cursor.execute(
+            "SELECT DISTINCT strftime('%m', date) as month FROM entries WHERE strftime('%Y', date) = ? ORDER BY month",
+            (year,),
+        )
+        return [row[0] for row in self.cursor.fetchall()]
 
     def close(self):
         self.conn.close()

@@ -1,11 +1,7 @@
-import sqlite3
-
-import pandas as pd
 import streamlit as st
 
-# SQLite データベースに接続
-conn = sqlite3.connect("database.db")
-cursor = conn.cursor()
+from krapp.date_extractor import DateExtractor
+from krapp.text_db_manager import TextDBManager
 
 # Streamlit セッション状態を使用して選択された年を保持
 if "selected_year" not in st.session_state:
@@ -14,35 +10,21 @@ if "selected_year" not in st.session_state:
 if "selected_month" not in st.session_state:
     st.session_state.selected_month = None
 
+if "db" not in st.session_state:
+    with st.spinner("Wait for it...", show_time=True):
+        st.session_state.db = TextDBManager(
+            folder_path="/Users/ishida/Documents/Texts",
+            date_extractor=DateExtractor(),
+        )
+        st.session_state.db.process_folder()
+
+db = st.session_state.db
 
 # データを取得する関数
-def get_entries_by_year_month(year, month):
-    cursor.execute(
-        "SELECT id, date, title, content FROM entries WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ? ORDER BY date DESC",
-        (year, month),
-    )
-    rows = cursor.fetchall()
-    return pd.DataFrame(rows, columns=["ID", "Date", "Title", "Content"])
-
-
-def get_all_years():
-    cursor.execute(
-        "SELECT DISTINCT strftime('%Y', date) as year FROM entries ORDER BY year DESC"
-    )
-    return [row[0] for row in cursor.fetchall()]
-
-
-def get_months_in_year(year):
-    cursor.execute(
-        "SELECT DISTINCT strftime('%m', date) as month FROM entries WHERE strftime('%Y', date) = ? ORDER BY month",
-        (year,),
-    )
-    return [row[0] for row in cursor.fetchall()]
-
 
 # サイドバーの設定
 st.sidebar.title("ナビゲーション")
-years = get_all_years()
+years = db.get_all_years()
 
 for year in years:
     if year is None:
@@ -53,7 +35,7 @@ for year in years:
 
 if st.session_state.selected_year:
     st.sidebar.markdown(f"### {st.session_state.selected_year} 年の月一覧")
-    months = get_months_in_year(st.session_state.selected_year)
+    months = db.get_months_in_year(st.session_state.selected_year)
 
     for month in months:
         if st.sidebar.button(f"{month} 月"):
@@ -64,7 +46,7 @@ if st.session_state.selected_year and st.session_state.selected_month:
     st.title(
         f"{st.session_state.selected_year} 年 {st.session_state.selected_month} 月の投稿一覧"
     )
-    filtered_entries = get_entries_by_year_month(
+    filtered_entries = db.get_entries_by_year_month(
         st.session_state.selected_year, st.session_state.selected_month
     )
 
@@ -76,5 +58,3 @@ if st.session_state.selected_year and st.session_state.selected_month:
             st.write("---")
     else:
         st.write("この月には投稿がありません。")
-
-conn.close()
