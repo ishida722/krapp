@@ -1,5 +1,6 @@
 import streamlit as st
 
+from krapp.content_formatter import ContentFormatter
 from krapp.date_extractor import DateExtractor
 from krapp.text_db_manager import TextDBManager
 
@@ -51,10 +52,11 @@ if st.session_state.selected_year and st.session_state.selected_month:
     )
 
     if len(filtered_entries) > 0:
+        formatter = ContentFormatter()
         for index, row in filtered_entries.iterrows():
             st.subheader(row["Title"])
             st.write(f"投稿日: {row['Date']}")
-            st.markdown(row["Content"])
+            st.markdown(formatter.format_content(row["Content"]))
             st.write("---")
     else:
         st.write("この月には投稿がありません。")
