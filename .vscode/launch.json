@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug create-db",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "krapp.cli",
+            "args": [
+                "create-db",
+                "--db-path",
+                "database.db",
+                "--folder-path",
+                "/Users/ishida/Documents/Texts/Inbox"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "streamlit app",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "src/krapp/streamlit_app.py"
+            ],
+            "justMyCode": false
+        }
+    ]
+}
