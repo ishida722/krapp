@@ -66,8 +66,8 @@ def test_convert_txt_to_md_shift_jis(tmp_path, sut):
     md_file_2 = output_folder / "file2.md"
     assert md_file_1.exists()
     assert md_file_2.exists()
-    assert md_file_1.read_text(encoding="shift-jis") == "ファイル1"
-    assert md_file_2.read_text(encoding="shift-jis") == "ファイル2"
+    assert md_file_1.read_text(encoding="utf-8") == "ファイル1"
+    assert md_file_2.read_text(encoding="utf-8") == "ファイル2"
 
 
 def test_convert_txt_to_md_empty_input_folder(tmp_path, sut):

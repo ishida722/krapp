@@ -24,7 +24,7 @@ class Txt2MdConverter:
                 # Read the content of the txt file
                 content = input_path.read_text(encoding=encoding)
                 # Write the content to the md file
-                output_path.write_text(content, encoding=encoding)
+                output_path.write_text(content, encoding="utf-8")
                 # 成功したらおわり
                 return
             except UnicodeDecodeError:
