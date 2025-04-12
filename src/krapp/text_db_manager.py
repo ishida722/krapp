@@ -1,68 +1,90 @@
-import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Final
 
 import pandas as pd
+from sqlalchemy import Column, Date, Integer, String, create_engine, inspect
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 from krapp.date_extractor import DateExtractor
+from krapp.yaml_frontmatter_parser import YamlFrontmatterParser
+
+Base = declarative_base()
+
+
+class Entry(Base):
+    __tablename__ = "entries"
+
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, nullable=True)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    char_count = Column(Integer)
+    happiness_score = Column(Integer, nullable=True)
 
 
 class TextDBManager:
     def __init__(
         self,
-        folder_path: str,
+        folder_path: str | Path,
         date_extractor: DateExtractor,
-        db_path: str | None = None,
+        yaml_parser: YamlFrontmatterParser,
+        db_path: str | Path | None = None,
     ):
-        self.folder_path = folder_path
-        self.conn = self._get_db_connection(db_path)
-        self.cursor = self.conn.cursor()
-        self._create_table()
-        self.date_extractor = date_extractor
+        self.folder_path: Final = Path(folder_path)
+        self.date_extractor: Final = date_extractor
+        self.yaml_parser: Final = yaml_parser
 
-    def _get_db_connection(self, db_path: str | None):
         if db_path is None:
-            return sqlite3.connect(":memory:")
-        return sqlite3.connect(db_path)
+            db_url = "sqlite:///:memory:"
+        else:
+            db_url = f"sqlite:///{db_path}"
 
-    def _create_table(self, recreate: bool = True):
-        if recreate:
-            # 既存のテーブルを削除する
-            self.cursor.execute("DROP TABLE IF EXISTS entries")
-            self.conn.commit()
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date DATE,
-                title TEXT,
-                content TEXT
-            )
-        """)
-        self.conn.commit()
+        self.engine: Final = create_engine(db_url)
+        self._create_tables()
 
-    def _save_entry(self, date: datetime | None, title: str, content: str):
-        self.cursor.execute(
-            "INSERT INTO entries (date, title, content) VALUES (?, ?, ?)",
-            (date, title, content),
+        self.session: Final = sessionmaker(bind=self.engine)()
+
+    def _create_tables(self, recreate: bool = True):
+        if recreate and inspect(self.engine).has_table("entries"):
+            Entry.__table__.drop(self.engine)
+
+        Base.metadata.create_all(self.engine)
+
+    def _save_entry(self, title: str, content: str):
+        # 文字数をカウント
+        char_count = len(content) if content else 0
+        # 日付を抽出
+        date = self._extract_date(title, content)
+        frontmatter = self.yaml_parser.parse(content)
+        entry = Entry(
+            date=date,
+            title=title,
+            content=content,
+            char_count=char_count,
+            happiness_score=frontmatter.get("happiness score", None),
         )
-        self.conn.commit()
+        self.session.add(entry)
+        self.session.commit()
         print(f"Saved entry: {title}: {date}")
 
+    def _extract_date(self, title: str, content: str) -> datetime | None:
+        date_list = self.date_extractor.extract_dates(f"{title}\n{content}")
+        # 日付が見つからない場合は、Noneを返す
+        if len(date_list) == 0:
+            return None
+        # 最初に見つかった日付を返す
+        return date_list[0]
+
     def process_folder(self):
-        folder = Path(self.folder_path)
-        for file_path in folder.rglob("*.md"):
+        for file_path in self.folder_path.rglob("*.md"):
             if not file_path.is_file():
                 continue
             try:
                 title = file_path.stem
                 content = file_path.read_text(encoding="utf-8")
-                date_list = self.date_extractor.extract_dates(f"{title}\n{content}")
-                if len(date_list) > 0:
-                    date = date_list[0]
-                else:
-                    date = None
                 self._save_entry(
-                    date=date,
                     title=title,
                     content=content,
                 )
@@ -70,25 +92,39 @@ class TextDBManager:
                 print(f"Error processing file {file_path}: {e}")
 
     def get_entries_by_year_month(self, year, month):
-        self.cursor.execute(
-            "SELECT id, date, title, content FROM entries WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ? ORDER BY date DESC",
-            (year, month),
+        query = (
+            self.session.query(Entry)
+            .filter(Entry.date.isnot(None), Entry.date.like(f"{year}-{month:02}-%"))
+            .order_by(Entry.date.desc())
         )
-        rows = self.cursor.fetchall()
-        return pd.DataFrame(rows, columns=["ID", "Date", "Title", "Content"])
+        rows = [
+            {
+                "ID": entry.id,
+                "Date": entry.date,
+                "Title": entry.title,
+                "Content": entry.content,
+            }
+            for entry in query.all()
+        ]
+        return pd.DataFrame(rows)
 
     def get_all_years(self):
-        self.cursor.execute(
-            "SELECT DISTINCT strftime('%Y', date) as year FROM entries ORDER BY year DESC"
+        query = (
+            self.session.query(Entry)
+            .filter(Entry.date.isnot(None))
+            .with_entities(Entry.date)
         )
-        return [row[0] for row in self.cursor.fetchall()]
+        years = {entry.date.year for entry in query if entry.date}
+        return sorted(years, reverse=True)
 
     def get_months_in_year(self, year):
-        self.cursor.execute(
-            "SELECT DISTINCT strftime('%m', date) as month FROM entries WHERE strftime('%Y', date) = ? ORDER BY month",
-            (year,),
+        query = (
+            self.session.query(Entry)
+            .filter(Entry.date.isnot(None), Entry.date.like(f"{year}-%"))
+            .with_entities(Entry.date)
         )
-        return [row[0] for row in self.cursor.fetchall()]
+        months = {entry.date.month for entry in query if entry.date}
+        return sorted(months)
 
     def close(self):
-        self.conn.close()
+        self.session.close()

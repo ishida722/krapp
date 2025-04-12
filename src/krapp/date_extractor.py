@@ -19,6 +19,9 @@ class DateExtractor:
             DatePatternFormat(r"\b\d{2}-\d{2}-\d{4}\b", "%m-%d-%Y"),
             DatePatternFormat(r"\b\d{2}/\d{2}/\d{4}\b", "%m/%d/%Y"),
             DatePatternFormat(r"\d{4}年\d{1,2}月\d{1,2}日", "%Y年%m月%d日"),
+            DatePatternFormat(r"\b\d{4}.\d{1,2}.\d{1,2}\b", "%Y.%m.%d"),
+            DatePatternFormat(r"\b\d{8}\b", "%Y%m%d"),
+            DatePatternFormat(r"\b(\d{8})_\d{4}\b", "%Y%m%d"),
         )
 
     def read_file(self, file_path: str) -> str:

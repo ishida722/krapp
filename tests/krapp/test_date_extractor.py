@@ -79,6 +79,20 @@ def test_extract_dates_with_mm_dd_yyyy(extractor):
     assert result == expected
 
 
+def test_extract_dates_with_yyyymmdd(extractor):
+    text = "20231015.md"
+    expected = [datetime(2023, 10, 15)]
+    result = extractor.extract_dates(text)
+    assert result == expected
+
+
+def test_extract_dates_with_yyyymmdd_time(extractor):
+    text = "20231015_1749.md"
+    expected = [datetime(2023, 10, 15)]
+    result = extractor.extract_dates(text)
+    assert result == expected
+
+
 def test_extract_dates_with_mm_dd_yyyy_hyphen(extractor):
     text = "The event is scheduled for 10-15-2023."
     expected = [datetime(2023, 10, 15)]
