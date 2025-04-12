@@ -1,5 +1,6 @@
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 from krapp.date_extractor import DateExtractor
@@ -22,8 +23,16 @@ class DiaryOrganizer:
             f"{input_md_file.stem}\n{content}"
         )
         if len(date_list) == 0:
-            raise ValueError("No valid date found in the markdown file.")
+            raise ValueError(
+                f"{input_md_file}. No valid date found in the markdown file."
+            )
         date = date_list[0]
+
+        if date == datetime.today():
+            print(
+                f"{input_md_file}. The date in the markdown file is today. No need to organize."
+            )
+            return
 
         # Create year and month folders
         year_folder = output_folder / str(date.year)
